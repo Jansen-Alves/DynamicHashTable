@@ -20,11 +20,20 @@ Cliente *criarCliente(int codigo, char *nome) {
     return novo;
 }
 
-Cliente *busca(FILE *tabhash, FILE*clientes, int codCliente){
+Cliente *busca(FILE *tabhash, FILE*clientes, FILE*meta, int codCliente){
+    int qtd, p, l, posicao;
     Cliente *procurado = (Cliente *)malloc(sizeof(Cliente));
     int validade = 0;
 
-    int posicao = codCliente % TAMANHO_HASH;
+    (&qtd, sizeof(int), 1, meta);
+    (&p, sizeof(int), 1, meta);
+    (&l, sizeof(int), 1, meta);
+
+    posicao = codCliente % (TAMANHO_HASH * pow(2,l));
+
+     if(posicao <p){
+        posicao = codCliente % (TAMANHO_HASH * pow(2,l+1));
+    }
 
     rewind(tabhash);
     //printf("Fazendo busca\n");
@@ -70,13 +79,24 @@ Cliente *busca(FILE *tabhash, FILE*clientes, int codCliente){
 }
 
 void inserir(FILE *tabhash, FILE *meta, FILE *clientes, Cliente *info){
-    int posicao, contador, valor;
+    int posicao, contador, valor, f_carga;
     int validade = 0;
+    int qtd, p, l;
+
+    (&qtd, sizeof(int), 1, meta);
+    (&p, sizeof(int), 1, meta);
+    (&l, sizeof(int), 1, meta);
+
+
     Cliente *checagem = (Cliente *)malloc(sizeof(Cliente));
-    posicao = info->codCliente % TAMANHO_HASH;
+    posicao = info->codCliente % (TAMANHO_HASH * pow(2,l));
+
+    if(posicao <p){
+        posicao = info->codCliente % (TAMANHO_HASH * pow(2,l+1));
+    }
     //printf("Posicao na hash eh %d", posicao);
 
-    checagem = busca(tabhash, clientes, info->codCliente);
+    checagem = busca(tabhash, clientes, meta, info->codCliente);
     if (checagem->codCliente == info->codCliente) {
         printf("A codCliente escolhida já é cadastrada pelo cliente %s, por favor escolha uma que não esteja em uso \n", checagem->nomeCliente);
         free(checagem);
@@ -177,10 +197,93 @@ void inserir(FILE *tabhash, FILE *meta, FILE *clientes, Cliente *info){
         printf("> Contador do metadados: %d \n", contador);
         printf("\nCliente cadastrado(a) com sucesso! \n");
     }
+    rewind(meta);
+    fseek(meta, sizeof(int), SEEK_SET);
+    f_carga = contador/(TAMANHO_HASH *pow(2,l));
+    if(f_carga >0,7){
+        p = p+1;
+        fwrite(&p, sizeof(int), 1, meta);
+        expandir(tabhash, meta, clientes);
+    }
+    if(p == TAMANHO_HASH * pow(2,l)){
+            l = l+1;
+            fwrite(&l, sizeof(int), 1, meta);
+    }
+   
+    
+   
     free(checagem);
     //free(info);
 }
 
+void expandir(FILE *tabhash, FILE *meta, FILE *clientes){
+    int p, l, contador, posicao, valor, validade, pos_hash, flag;
+    int pos_ant, pos_new;
+    Cliente *checagem = (Cliente *)malloc(sizeof(Cliente));
+    Cliente *info = (Cliente *)malloc(sizeof(Cliente));
+    rewind(meta);
+    fwrite(&contador, sizeof(int), 1, meta);
+    fwrite(&p, sizeof(int), 1, meta);
+    fwrite(&l, sizeof(int), 1, meta);
+    valor = 0;
+    pos_new = -1;
+    while(valor <p){
+        rewind(tabhash);
+        fseek(tabhash,sizeof(int) * valor, SEEK_SET);
+        fread(&posicao, sizeof(int), 1, tabhash);
+        flag = 0;
+
+        if(posicao != -1);
+         while (validade == 0) {
+            rewind(clientes);
+            fseek(clientes, sizeof(Cliente) * posicao, SEEK_SET);
+            //printf("pulo de %d \n", posicao);
+            fread(&checagem->codCliente, sizeof(int), 1, clientes);
+            fread(checagem->nomeCliente, sizeof(char), sizeof(checagem->nomeCliente), clientes);
+            //printf("nomeCliente na fila: %s \n", checagem->nomeCliente);
+            fread(&checagem->estadoOcupacao, sizeof(int), 1, clientes);
+            fread(&checagem->ponteiroProx, sizeof(int), 1, clientes);
+
+            pos_hash = checagem->codCliente/ (TAMANHO_HASH * pow(2,l+1));
+          
+            //printf("%d\n", checagem->ponteiroProx);
+
+            if (pos_hash != valor) {
+               if(flag == 0){
+                flag = 1;
+                rewind(tabhash);
+                fseek(tabhash, sizeof(Cliente) * pos_hash, SEEK_SET);
+                fwrite(&posicao, sizeof(int), 1, tabhash);
+               }
+               pos_new = posicao;
+               info->codCliente = checagem->codCliente;
+               info->nomeCliente = checagem->nomeCliente;
+               info->estadoOcupacao = checagem->estadoOcupacao;
+               info->ponteiroProx = checagem->ponteiroProx;
+
+
+            }else if(pos_hash == valor){
+                if(pos_new != -1){
+                    rewind(clientes);
+                    fseek(clientes, sizeof(Cliente) * pos_ant, SEEK_SET);
+                    fread(&info->codCliente, sizeof(int), 1, clientes);
+                    fread(info->nomeCliente, sizeof(char), sizeof(info->nomeCliente), clientes);
+                    fread(&info->estadoOcupacao, sizeof(int), 1, clientes);
+                    fwrite(&posicao, sizeof(int), 1, clientes);
+                }
+                pos_ant = posicao;
+
+            }
+            posicao = checagem->ponteiroProx;
+        }
+
+
+
+
+    }
+
+
+}
 // Mostrar o codigo do cliente em forma de estrutura Hash Exterior
 void mostrarTabela(){
     FILE *tabhash;
